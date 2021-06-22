@@ -1,56 +1,40 @@
-#!/bin/sh
+#!/usr/bin/env bash
+# bin/compile <build-dir> <cache-dir>
 
-indent() {
-  sed -u 's/^/       /'
-}
+set -e
 
 BUILD_DIR=$1
 CACHE_DIR=$2
-ENV_DIR=$3
 
-if [ -f "$ENV_DIR/WKHTMLTOPDF_URL" ]; then
-  DOWNLOAD_URL=$(cat $ENV_DIR/WKHTMLTOPDF_URL)
+BIN_PATH="$BUILD_DIR/bin"
+TMP_PATH="$BUILD_DIR/tmp"
+mkdir -p $CACHE_DIR $BIN_PATH $TMP_PATH
+                 
+WKHTMLTOPDF_URL="https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.focal_amd64.deb"
+WKHTMLTOPDF_PKG="$CACHE_DIR/wkhtmltopdf.deb"
+WKHTMLTOPDF_PATH="$TMP_PATH/wkhtmltopdf"
+WKHTMLTOPDF_BINARIES="$WKHTMLTOPDF_PATH/usr/local/bin"
+
+BIN_DIR=$(cd $(dirname $0); pwd)
+
+if [ -f $WKHTMLTOPDF_PKG ]; then
+  echo "-----> Using wkhtmltopdf Debian package (focal_amd64) from cache"
 else
-  DOWNLOAD_URL="https://github.com/wkhtmltopdf/wkhtmltopdf/releases/download/0.12.4/{wkhtmltox-0.12.4_linux-generic-amd64.tar.xz,SHA1SUMS}"
+  echo "-----> Downloading wkhtmltopdf Debian package"
+  curl -L $WKHTMLTOPDF_URL -o $WKHTMLTOPDF_PKG
 fi
 
-PACKAGE=${DOWNLOAD_URL##*{}
-if [ ${#PACKAGE} -eq ${#DOWNLOAD_URL} ]; then
-  PACKAGE=${DOWNLOAD_URL##*/}
-else
-  PACKAGE_CHECKSUM=${PACKAGE##*,}
-  PACKAGE_CHECKSUM=${PACKAGE_CHECKSUM%\}}
-  PACKAGE=${PACKAGE%,*}
-fi
+echo "-----> Unpacking Debian package"
+dpkg -x $WKHTMLTOPDF_PKG $WKHTMLTOPDF_PATH
 
-download="curl -sLO"
-extract="tar x -C $CACHE_DIR -f"
-install=""
-verify="sha1sum --check --warn"
+echo "-----> Setting permissions"
+chmod +x $WKHTMLTOPDF_BINARIES/*
 
-mkdir -p $BUILD_DIR/bin
+echo "-----> Moving binaries to the right place"
+mv $WKHTMLTOPDF_BINARIES/* $BIN_PATH/
 
-if [ ! -f "$CACHE_DIR/$PACKAGE" ]; then
-  echo "downloading $DOWNLOAD_URL" | indent
-  $download $DOWNLOAD_URL
+echo "-----> Removing wkhtmltoimage binary"
+rm -rf "$BIN_PATH/wkhtmltoimage"
 
-  if [ -z "$PACKAGE_CHECKSUM" ]; then
-    $download $DOWNLOAD_URL.sha1.txt
-  elif [ $PACKAGE_CHECKSUM != $PACKAGE.sha1.txt ]; then
-    grep $PACKAGE $PACKAGE_CHECKSUM > $PACKAGE.sha1.txt
-  fi
-
-  echo "verifying checksum" | indent
-  $verify ${PACKAGE}.sha1.txt
-
-  if [ $? -eq 0 ]; then
-    mv $PACKAGE $PACKAGE.sha1.txt $CACHE_DIR
-  else
-    rm $PACKAGE $PACKAGE.sha1.txt
-    exit 1
-  fi
-
-  $extract $CACHE_DIR/$PACKAGE
-fi
-
-cp $CACHE_DIR/wkhtmltox/bin/* $BUILD_DIR/bin/
+echo "-----> Cleaning up"
+rm -rf $WKHTMLTOPDF_PATH
