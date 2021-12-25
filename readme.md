@@ -1,5 +1,14 @@
 # Heroku Buildpack: wkhtmltopdf
 
+This was made for private use for a program hosted on Heroku.
+
+Edits made:
+* Keep wkhtmltoimage and remove wkhtmltopdf
+* Use `bionic_amd64.deb` instead of `focal_amd64.deb`
+* Output folder changed to `$BUILD_DIR/bin/heroku_output` instead of `$BUILD_DIR/bin`
+
+---
+
 Downloads wkhtmlto* binaries, then copies bin/
 
 ## Tested against following
